@@ -297,7 +297,7 @@ _SCHEMA_OVERRIDES: Dict[str, Dict[str, Any]] = {
     "dashboard.theme": {
         "type": "select",
         "description": "Web dashboard visual theme",
-        "options": ["default", "midnight", "ember", "mono", "cyberpunk", "rose"],
+        "options": ["default", "midnight", "ember", "mono", "cyberpunk", "rose", "athena-dark"],
     },
     "display.resume_display": {
         "type": "select",
@@ -312,7 +312,7 @@ _SCHEMA_OVERRIDES: Dict[str, Dict[str, Any]] = {
     "memory.provider": {
         "type": "select",
         "description": "Memory provider plugin",
-        "options": ["builtin", "honcho"],
+        "options": ["builtin", "honcho", "wiki"],
     },
     "approvals.mode": {
         "type": "select",
@@ -3027,6 +3027,238 @@ async def toggle_skill(body: SkillToggle):
     return {"ok": True, "name": body.name, "enabled": body.enabled}
 
 
+# ---------------------------------------------------------------------------
+# LLM Wiki endpoints
+# ---------------------------------------------------------------------------
+
+class WikiPageUpdate(BaseModel):
+    page_name: str
+    category: str
+    content: str
+    metadata: Optional[dict] = None
+
+
+@app.get("/api/wiki/pages")
+async def get_wiki_pages():
+    wiki_dir = get_hermes_home() / "wiki"
+    wiki_dir.mkdir(parents=True, exist_ok=True)
+    for cat in ["concepts", "entities", "sources"]:
+        (wiki_dir / cat).mkdir(exist_ok=True)
+        
+    pages = []
+    for file in wiki_dir.rglob("*.md"):
+        if file.is_dir():
+            continue
+        rel_path = file.relative_to(wiki_dir)
+        category = str(rel_path.parent) if rel_path.parent != Path(".") else ""
+        
+        title = file.stem
+        tags = []
+        try:
+            content = file.read_text(encoding="utf-8")
+            match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+            if match:
+                import yaml
+                meta = yaml.safe_load(match.group(1)) or {}
+                if "title" in meta:
+                    title = meta["title"]
+                if "tags" in meta:
+                    tags = meta["tags"]
+                    if isinstance(tags, str):
+                        tags = [t.strip() for t in tags.split(",")]
+        except Exception:
+            pass
+            
+        pages.append({
+            "page_name": file.stem,
+            "category": category,
+            "title": title,
+            "tags": tags,
+            "size": file.stat().st_size,
+            "modified": file.stat().st_mtime
+        })
+    return {"pages": pages}
+
+
+@app.get("/api/wiki/page")
+async def get_wiki_page(page_name: str, category: str = ""):
+    wiki_dir = get_hermes_home() / "wiki"
+    page_name = Path(page_name).name
+    category = Path(category).name if category else ""
+    
+    if category:
+        file_path = wiki_dir / category / f"{page_name}.md"
+    else:
+        file_path = wiki_dir / f"{page_name}.md"
+        
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Page not found")
+        
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
+        
+    metadata = {}
+    clean_content = content
+    match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+    if match:
+        frontmatter_str = match.group(1)
+        clean_content = content[match.end():]
+        try:
+            import yaml
+            metadata = yaml.safe_load(frontmatter_str) or {}
+        except Exception:
+            pass
+            
+    return {
+        "page_name": page_name,
+        "category": category,
+        "content": clean_content,
+        "metadata": metadata,
+        "raw": content
+    }
+
+
+@app.post("/api/wiki/page")
+async def save_wiki_page(body: WikiPageUpdate):
+    wiki_dir = get_hermes_home() / "wiki"
+    page_name = Path(body.page_name).name
+    category = Path(body.category).name if body.category else ""
+    
+    if category not in ["concepts", "entities", "sources", ""]:
+        raise HTTPException(status_code=400, detail="Invalid category")
+        
+    if category:
+        target_dir = wiki_dir / category
+    else:
+        target_dir = wiki_dir
+        
+    target_dir.mkdir(parents=True, exist_ok=True)
+    file_path = target_dir / f"{page_name}.md"
+    
+    content = body.content
+    metadata = body.metadata or {}
+    
+    existing_meta = {}
+    clean_content = content
+    match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+    if match:
+        frontmatter_str = match.group(1)
+        clean_content = content[match.end():]
+        try:
+            import yaml
+            existing_meta = yaml.safe_load(frontmatter_str) or {}
+        except Exception:
+            pass
+            
+    existing_meta.update(metadata)
+    
+    yaml_header = ""
+    if existing_meta:
+        try:
+            import yaml
+            yaml_header = "---\n" + yaml.safe_dump(existing_meta, default_flow_style=False).strip() + "\n---\n\n"
+        except Exception:
+            pass
+            
+    try:
+        file_path.write_text(yaml_header + clean_content, encoding="utf-8")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write file: {e}")
+        
+    return {"success": True}
+
+
+@app.delete("/api/wiki/page")
+async def delete_wiki_page(page_name: str, category: str = ""):
+    wiki_dir = get_hermes_home() / "wiki"
+    page_name = Path(page_name).name
+    category = Path(category).name if category else ""
+    
+    if category:
+        file_path = wiki_dir / category / f"{page_name}.md"
+    else:
+        file_path = wiki_dir / f"{page_name}.md"
+        
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Page not found")
+        
+    try:
+        file_path.unlink()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {e}")
+        
+    return {"success": True}
+
+
+@app.get("/api/wiki/graph")
+async def get_wiki_graph():
+    wiki_dir = get_hermes_home() / "wiki"
+    wiki_dir.mkdir(parents=True, exist_ok=True)
+    
+    nodes = {}
+    links = []
+    
+    # 1. Discover all existing pages
+    for file in wiki_dir.rglob("*.md"):
+        if file.is_dir():
+            continue
+        rel_path = file.relative_to(wiki_dir)
+        category = str(rel_path.parent) if rel_path.parent != Path(".") else ""
+        page_name = file.stem
+        
+        title = page_name
+        try:
+            content = file.read_text(encoding="utf-8")
+            match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+            if match:
+                import yaml
+                meta = yaml.safe_load(match.group(1)) or {}
+                if "title" in meta:
+                    title = meta["title"]
+        except Exception:
+            pass
+            
+        nodes[page_name] = {
+            "id": page_name,
+            "title": title,
+            "category": category,
+            "type": "existing"
+        }
+        
+    # 2. Extract links
+    link_regex = re.compile(r"\[\[([^\]|]+)(?:\|[^\]]*)?\]\]")
+    for file in wiki_dir.rglob("*.md"):
+        if file.is_dir():
+            continue
+        source_name = file.stem
+        try:
+            content = file.read_text(encoding="utf-8")
+            for match in link_regex.finditer(content):
+                target_name = match.group(1).strip()
+                if not target_name:
+                    continue
+                if target_name not in nodes:
+                    nodes[target_name] = {
+                        "id": target_name,
+                        "title": target_name,
+                        "category": "",
+                        "type": "stub"
+                    }
+                links.append({
+                    "source": source_name,
+                    "target": target_name
+                })
+        except Exception:
+            pass
+            
+    return {
+        "nodes": list(nodes.values()),
+        "links": links
+    }
+
+
 @app.get("/api/tools/toolsets")
 async def get_toolsets():
     from hermes_cli.tools_config import (
@@ -3757,6 +3989,7 @@ _BUILTIN_DASHBOARD_THEMES = [
     {"name": "mono",      "label": "Mono",           "description": "Clean grayscale — minimal and focused"},
     {"name": "cyberpunk", "label": "Cyberpunk",      "description": "Neon green on black — matrix terminal"},
     {"name": "rose",      "label": "Rosé",           "description": "Soft pink and warm ivory — easy on the eyes"},
+    {"name": "athena-dark",   "label": "Athena Dark",         "description": "Slate-black developer theme with glowing sky-blue accents"},
 ]
 
 

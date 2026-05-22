@@ -341,6 +341,30 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     }),
+
+  // LLM Wiki endpoints
+  getWikiPages: () => fetchJSON<{ pages: WikiPageSummary[] }>("/api/wiki/pages"),
+  getWikiPage: (page_name: string, category?: string) => {
+    const qs = new URLSearchParams();
+    qs.set("page_name", page_name);
+    if (category) qs.set("category", category);
+    return fetchJSON<WikiPageDetail>(`/api/wiki/page?${qs.toString()}`);
+  },
+  saveWikiPage: (body: { page_name: string; category: string; content: string; metadata?: Record<string, any> }) =>
+    fetchJSON<{ success: boolean }>("/api/wiki/page", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  deleteWikiPage: (page_name: string, category?: string) => {
+    const qs = new URLSearchParams();
+    qs.set("page_name", page_name);
+    if (category) qs.set("category", category);
+    return fetchJSON<{ success: boolean }>(`/api/wiki/page?${qs.toString()}`, {
+      method: "DELETE",
+    });
+  },
+  getWikiGraph: () => fetchJSON<WikiGraphData>("/api/wiki/graph"),
 };
 
 export interface ActionResponse {
@@ -817,4 +841,40 @@ export interface AgentPluginUpdateResponse {
 export interface PluginProvidersPutRequest {
   memory_provider?: string;
   context_engine?: string;
+}
+
+// ── LLM Wiki types ──────────────────────────────────────────────────────
+
+export interface WikiPageSummary {
+  page_name: string;
+  category: string;
+  title: string;
+  tags: string[];
+  size: number;
+  modified: number;
+}
+
+export interface WikiPageDetail {
+  page_name: string;
+  category: string;
+  content: string;
+  metadata: Record<string, any>;
+  raw: string;
+}
+
+export interface WikiGraphNode {
+  id: string;
+  title: string;
+  category: string;
+  type: "existing" | "stub";
+}
+
+export interface WikiGraphLink {
+  source: string;
+  target: string;
+}
+
+export interface WikiGraphData {
+  nodes: WikiGraphNode[];
+  links: WikiGraphLink[];
 }

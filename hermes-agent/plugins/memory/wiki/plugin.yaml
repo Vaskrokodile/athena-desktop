@@ -1,0 +1,3 @@
+name: wiki
+version: 1.0.0
+description: "LLM Wiki long-term memory system with interlinked notes, automatic fact extraction, and a visual knowledge graph."

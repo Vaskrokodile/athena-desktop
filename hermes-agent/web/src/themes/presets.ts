@@ -203,6 +203,30 @@ export const defaultLargeTheme: DashboardTheme = {
     density: "spacious",
   },
 };
+export const athenaDarkTheme: DashboardTheme = {
+  name: "athena-dark",
+  label: "Athena Dark",
+  description: "Slate-black developer theme with glowing sky-blue accents",
+  palette: {
+    background: { hex: "#07090e", alpha: 1 },
+    midground: { hex: "#cbd5e1", alpha: 1 },
+    foreground: { hex: "#ffffff", alpha: 0 },
+    warmGlow: "rgba(56, 189, 248, 0.3)",
+    noiseOpacity: 0.5,
+  },
+  typography: {
+    ...DEFAULT_TYPOGRAPHY,
+    fontSans: `"Inter", ${SYSTEM_SANS}`,
+    fontMono: `"JetBrains Mono", ${SYSTEM_MONO}`,
+    fontUrl:
+      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap",
+    letterSpacing: "-0.01em",
+  },
+  layout: {
+    ...DEFAULT_LAYOUT,
+    radius: "0.5rem",
+  },
+};
 
 export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   default: defaultTheme,
@@ -212,4 +236,6 @@ export const BUILTIN_THEMES: Record<string, DashboardTheme> = {
   mono: monoTheme,
   cyberpunk: cyberpunkTheme,
   rose: roseTheme,
+  "athena-dark": athenaDarkTheme,
 };
+

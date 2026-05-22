@@ -95,6 +95,7 @@ export interface Translations {
       plugins: string;
       sessions: string;
       skills: string;
+      wiki?: string;
     };
     modelToolsSheetSubtitle: string;
     modelToolsSheetTitle: string;
