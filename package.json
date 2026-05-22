@@ -1,0 +1,19 @@
+{
+  "name": "hermes-desktop",
+  "version": "1.0.0",
+  "description": "Desktop Electron wrapper for the Hermes Agent",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "hermes",
+    "agent",
+    "electron"
+  ],
+  "author": "Nous Research & Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.2"
+  }
+}

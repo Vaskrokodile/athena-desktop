@@ -1,0 +1,26 @@
+# Electron package files
+node_modules/
+
+# Python virtual environments and caches
+.venv/
+.uv_cache/
+.pip_cache/
+.hermes/
+
+# Subfolder python files
+hermes-agent/.venv/
+hermes-agent/.uv_cache/
+hermes-agent/.pip_cache/
+hermes-agent/.hermes/
+
+# Subfolder node files
+hermes-agent/web/node_modules/
+
+# Logs and user specific states
+*.log
+.env
+.env.local
+config.yaml
+state.db
+active_profile
+auth.json
